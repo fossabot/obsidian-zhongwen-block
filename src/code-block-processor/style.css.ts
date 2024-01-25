@@ -9,27 +9,6 @@ export const container = style({
     },
 });
 
-export const pinyinLine = style({
-    position: 'absolute',
-    top: '0',
-    left: '0',
-    lineHeight: '2.7rem',
-    zIndex: '0',
-});
-
-export const hiddenZhBlock = style({
-    display: 'inline-block',
-    position: 'relative',
-});
-
-export const hiddenZhChar = style({
-    opacity: '0',
-});
-
-export const hiddenNonZh = style({
-    opacity: '0',
-});
-
 export const pinyin = {
     base: style({
         position: 'absolute',
@@ -50,13 +29,3 @@ export const pinyin = {
         },
     }),
 };
-
-export const zhCharLine = style({
-    position: 'relative',
-    lineHeight: '2.7rem',
-    zIndex: '1',
-});
-
-export const visibleZhBlock = style({
-    display: 'inline-block',
-});

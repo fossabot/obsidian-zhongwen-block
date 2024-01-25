@@ -35,6 +35,7 @@ export default [
         rules: {
             ...ts.configs['strict-type-checked'].rules,
             ...ts.configs['stylistic-type-checked'].rules,
+            'no-undef': 'off',
         },
     },
 ];

@@ -29,5 +29,31 @@ export class SettingTabImpl
                         await this.plugin.saveSettings();
                     }),
             );
+
+        if (this.plugin.fonts === null) return;
+
+        new Obsidian.Setting(containerEl)
+            .setName('Font')
+            .addDropdown((dropdown) => {
+                dropdown.addOption('', '[Default font]');
+
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                for (const [postscriptName, fontData] of this.plugin.fonts!) {
+                    dropdown.addOption(postscriptName, fontData.fullName);
+                }
+
+                if (this.plugin.settings.font !== null) {
+                    dropdown.setValue(this.plugin.settings.font);
+                }
+
+                dropdown.onChange(async (selectedFont) => {
+                    this.plugin.settings.font =
+                        selectedFont !== '' ? selectedFont : null;
+
+                    this.plugin.clearLayoutMemo();
+
+                    await this.plugin.saveSettings();
+                });
+            });
     }
 }

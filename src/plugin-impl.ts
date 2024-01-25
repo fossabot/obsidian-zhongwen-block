@@ -17,7 +17,10 @@ const domReady = (): Promise<void> =>
     });
 
 export class PluginImpl extends Obsidian.Plugin implements Plugin {
+    fonts: Map<string, FontData> | null = null;
     settings!: Settings;
+
+    layoutMemo: LayoutMemo = new Map();
 
     async onload() {
         this.settings = Object.assign(
@@ -28,8 +31,6 @@ export class PluginImpl extends Obsidian.Plugin implements Plugin {
 
         this.addSettingTab(new SettingTabImpl(this.app, this));
 
-        const layoutMemo: LayoutMemo = new Map();
-
         this.registerMarkdownCodeBlockProcessor(
             'zh-cn',
             async (source, element) => {
@@ -39,10 +40,24 @@ export class PluginImpl extends Obsidian.Plugin implements Plugin {
                     source,
                     element,
                     this.settings,
-                    layoutMemo,
+                    this.layoutMemo,
                 );
             },
         );
+
+        if ('queryLocalFonts' in window) {
+            const fonts = await queryLocalFonts();
+
+            this.fonts = new Map<string, FontData>();
+
+            for (const font of fonts) {
+                this.fonts.set(font.postscriptName, font);
+            }
+        }
+    }
+
+    clearLayoutMemo() {
+        this.layoutMemo.clear();
     }
 
     async saveSettings() {

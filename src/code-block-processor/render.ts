@@ -1,49 +1,16 @@
 import * as PinyinPro from 'pinyin-pro';
 
-import { waitAndMeasureCorrectWidth } from './measure-width';
 import type { LayoutMemo, ZhCharBlockLayout } from './memo';
 import {
     NonZhSegment,
     ZhSegment,
     splitSentenceIntoSegments,
 } from './split-sentence';
-import type { Branded } from '../branded';
 import type { Settings } from '../settings';
+import { type PinyinLine, PinyinLineImpl } from './pinyin-line';
+import { type ZhCharLine, ZhCharLineImpl } from './zh-char-line';
 
 import * as styles from './style.css';
-
-type PinyinLine = Branded<HTMLDivElement, 'pinyinLine'>;
-
-type HiddenZhChar = Branded<HTMLSpanElement, 'hiddenZhChar'>;
-
-type PinyinSpan = Branded<HTMLSpanElement, 'pinyinSpan'>;
-
-type ZhCharLine = Branded<HTMLDivElement, 'zhCharLine'>;
-
-const createHiddenZhBlock = (
-    pinyinLine: PinyinLine,
-    {
-        zhChar,
-        pinyin,
-        pinyinSpanClass,
-    }: { zhChar: string; pinyin: string; pinyinSpanClass: string },
-): { hiddenZhChar: HiddenZhChar; pinyinSpan: PinyinSpan } => {
-    const hiddenZhBlock = pinyinLine.createDiv({
-        cls: styles.hiddenZhBlock,
-    });
-
-    const hiddenZhChar = hiddenZhBlock.createSpan({
-        cls: styles.hiddenZhChar,
-        text: zhChar,
-    }) as HiddenZhChar;
-
-    const pinyinSpan = hiddenZhBlock.createSpan({
-        cls: pinyinSpanClass,
-        text: pinyin,
-    }) as PinyinSpan;
-
-    return { hiddenZhChar, pinyinSpan };
-};
 
 const gap = 2;
 
@@ -64,43 +31,43 @@ const computePadding = ({
               zhCharPadding: gap,
           };
 
-const createVisibleZhBlock = (
-    zhCharLine: ZhCharLine,
-    zhChar: string,
-    zhCharPadding: number,
-): void => {
-    const visibleZhBlock = zhCharLine.createDiv({
-        cls: styles.visibleZhBlock,
-        text: zhChar,
-    });
-    visibleZhBlock.style.paddingLeft = `${zhCharPadding}px`;
-    visibleZhBlock.style.paddingRight = `${zhCharPadding}px`;
-};
-
-const renderNonZhSegment = (
-    segment: NonZhSegment,
-    {
-        pinyinLine,
-        zhCharLine,
-    }: { pinyinLine: PinyinLine; zhCharLine: ZhCharLine },
-): void => {
-    pinyinLine.createSpan({
-        cls: styles.hiddenNonZh,
-        text: segment.nonZhChars,
+const renderNonZhSegment = ({
+    segment,
+    pinyinLine,
+    zhCharLine,
+    font,
+}: {
+    segment: NonZhSegment;
+    pinyinLine: PinyinLine;
+    zhCharLine: ZhCharLine;
+    font: string | null;
+}): void => {
+    pinyinLine.createNonZh({
+        nonZhChars: segment.nonZhChars,
+        font,
     });
 
-    zhCharLine.appendText(segment.nonZhChars);
+    zhCharLine.createNonZh({
+        nonZhChars: segment.nonZhChars,
+        font,
+    });
 };
 
-const renderAndMemorizeZhSegment = async (
-    segment: ZhSegment,
-    {
-        pinyinLine,
-        zhCharLine,
-    }: { pinyinLine: PinyinLine; zhCharLine: ZhCharLine },
-    pinyinSpanClass: string,
-    layoutMemo: LayoutMemo,
-): Promise<void> => {
+const renderAndMemorizeZhSegment = async ({
+    segment,
+    pinyinLine,
+    zhCharLine,
+    pinyinSpanClass,
+    layoutMemo,
+    font,
+}: {
+    segment: ZhSegment;
+    pinyinLine: PinyinLine;
+    zhCharLine: ZhCharLine;
+    pinyinSpanClass: string;
+    layoutMemo: LayoutMemo;
+    font: string | null;
+}): Promise<void> => {
     const zhCharBlocks: ZhCharBlockLayout[] = [];
 
     const pinyinData = PinyinPro.pinyin(segment.zhChars, {
@@ -108,28 +75,25 @@ const renderAndMemorizeZhSegment = async (
     });
 
     for (const { pinyin, origin: zhChar } of pinyinData) {
-        const { hiddenZhChar, pinyinSpan } = createHiddenZhBlock(pinyinLine, {
+        const { hiddenZhChar, pinyinSpan } = pinyinLine.appendZhCharBlock({
             zhChar,
             pinyin,
             pinyinSpanClass,
+            font,
         });
 
-        const zhCharWidth = await waitAndMeasureCorrectWidth(hiddenZhChar);
-
-        const pinyinWidth = await waitAndMeasureCorrectWidth(pinyinSpan);
+        const zhCharWidth = await hiddenZhChar.waitAndMeasureCorrectWidth();
+        const pinyinWidth = await pinyinSpan.waitAndMeasureCorrectWidth();
 
         const { zhCharPadding, pinyinPadding } = computePadding({
             zhCharWidth,
             pinyinWidth,
         });
 
-        hiddenZhChar.style.paddingLeft = `${zhCharPadding}px`;
-        hiddenZhChar.style.paddingRight = `${zhCharPadding}px`;
+        hiddenZhChar.setPadding(zhCharPadding);
+        pinyinSpan.setPadding(pinyinPadding);
 
-        pinyinSpan.style.paddingLeft = `${pinyinPadding}px`;
-        pinyinSpan.style.paddingRight = `${pinyinPadding}px`;
-
-        createVisibleZhBlock(zhCharLine, zhChar, zhCharPadding);
+        zhCharLine.appendZhBlock({ zhChar, zhCharPadding, font });
 
         zhCharBlocks.push({
             zhChar,
@@ -142,19 +106,25 @@ const renderAndMemorizeZhSegment = async (
     layoutMemo.set(segment.zhChars, zhCharBlocks);
 };
 
-const renderMemorizedZhSegment = (
-    zhCharBlocks: ZhCharBlockLayout[],
-    {
-        pinyinLine,
-        zhCharLine,
-    }: { pinyinLine: PinyinLine; zhCharLine: ZhCharLine },
-    pinyinSpanClass: string,
-): void => {
+const renderMemorizedZhSegment = ({
+    zhCharBlocks,
+    pinyinLine,
+    zhCharLine,
+    pinyinSpanClass,
+    font,
+}: {
+    zhCharBlocks: ZhCharBlockLayout[];
+    pinyinLine: PinyinLine;
+    zhCharLine: ZhCharLine;
+    pinyinSpanClass: string;
+    font: string | null;
+}): void => {
     for (const { zhChar, zhCharWidth, pinyin, pinyinWidth } of zhCharBlocks) {
-        const { hiddenZhChar, pinyinSpan } = createHiddenZhBlock(pinyinLine, {
+        const { hiddenZhChar, pinyinSpan } = pinyinLine.appendZhCharBlock({
             zhChar,
             pinyin,
             pinyinSpanClass,
+            font,
         });
 
         const { zhCharPadding, pinyinPadding } = computePadding({
@@ -162,13 +132,10 @@ const renderMemorizedZhSegment = (
             pinyinWidth,
         });
 
-        hiddenZhChar.style.paddingLeft = `${zhCharPadding}px`;
-        hiddenZhChar.style.paddingRight = `${zhCharPadding}px`;
+        hiddenZhChar.setPadding(zhCharPadding);
+        pinyinSpan.setPadding(pinyinPadding);
 
-        pinyinSpan.style.paddingLeft = `${pinyinPadding}px`;
-        pinyinSpan.style.paddingRight = `${pinyinPadding}px`;
-
-        createVisibleZhBlock(zhCharLine, zhChar, zhCharPadding);
+        zhCharLine.appendZhBlock({ zhChar, zhCharPadding, font });
     }
 };
 
@@ -189,41 +156,43 @@ export const codeBlockProcessor = async (
         },
     });
 
-    const pinyinLine = container.createDiv({
-        cls: styles.pinyinLine,
-        attr: {
-            'aria-hidden': true,
-        },
-    }) as PinyinLine;
+    const pinyinLine = new PinyinLineImpl(container);
 
-    const zhCharLine = container.createDiv({
-        cls: styles.zhCharLine,
-    }) as ZhCharLine;
+    const zhCharLine = new ZhCharLineImpl(container);
 
     const segments = splitSentenceIntoSegments(source.trim());
 
     for (const segment of segments) {
         if (segment.type === 'nonZh') {
-            renderNonZhSegment(segment, { pinyinLine, zhCharLine });
+            renderNonZhSegment({
+                segment,
+                pinyinLine,
+                zhCharLine,
+                font: settings.font,
+            });
             continue;
         }
 
         const zhCharBlocks = layoutMemo.get(segment.zhChars);
 
         if (zhCharBlocks === undefined) {
-            await renderAndMemorizeZhSegment(
+            await renderAndMemorizeZhSegment({
                 segment,
-                { pinyinLine, zhCharLine },
+                pinyinLine,
+                zhCharLine,
                 pinyinSpanClass,
                 layoutMemo,
-            );
+                font: settings.font,
+            });
             continue;
         }
 
-        renderMemorizedZhSegment(
+        renderMemorizedZhSegment({
             zhCharBlocks,
-            { pinyinLine, zhCharLine },
+            pinyinLine,
+            zhCharLine,
             pinyinSpanClass,
-        );
+            font: settings.font,
+        });
     }
 };
