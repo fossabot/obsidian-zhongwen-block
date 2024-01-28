@@ -43,6 +43,23 @@ export class PluginImpl extends Obsidian.Plugin implements Plugin {
                 );
             },
         );
+
+        const fontFamilyName = 'Noto Sans Simplified Chinese';
+        const googleFontsUrl =
+            'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400';
+        const cssFontFaces = await Obsidian.request(googleFontsUrl);
+        const matchedUrls = cssFontFaces.match(/url\(.*?\)/g);
+        if (matchedUrls !== null) {
+            Promise.all(
+                matchedUrls.map(async (url) => {
+                    const font = new FontFace(fontFamilyName, url);
+                    await font.load();
+                    document.fonts.add(font);
+                }),
+            ).then(() => {
+                console.log('Fonts loaded');
+            });
+        }
     }
 
     async saveSettings() {

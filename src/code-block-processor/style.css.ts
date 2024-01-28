@@ -23,6 +23,7 @@ export const hiddenZhBlock = style({
 });
 
 export const hiddenZhChar = style({
+    fontFamily: "'Noto Sans Simplified Chinese'",
     opacity: '0',
 });
 
@@ -59,4 +60,5 @@ export const zhCharLine = style({
 
 export const visibleZhBlock = style({
     display: 'inline-block',
+    fontFamily: "'Noto Sans Simplified Chinese'",
 });
